@@ -84,6 +84,8 @@ function [div_est,w,h]=EnDive(X,Y,varargin)
 %       A numeric value between 0 and 1 that gives the exponent value for
 %       the Renyi divergence functional. Only used if the 'Renyi' option is
 %       selected. 
+%   'quiet' 
+%       Adding this option suppresses the output commentary.
 
 % Written by Kevin Moon, January 2023
 % 
@@ -107,6 +109,7 @@ cvx_w=0;
 kernel='RBF';
 div_type='KL';
 a=0.5;
+quiet=0;
 
 % Get input parameters
 for i=1:length(varargin)
@@ -180,6 +183,9 @@ for i=1:length(varargin)
     if(strcmpi(varargin{i},'alpha'))
         a=varargin{i+1};
     end
+    if(strcmpi(varargin{i},'quiet'))
+        quiet=1;
+    end
 end
 
 % Obtain the kernel function
@@ -244,14 +250,14 @@ if ~hcustom
         if est==1
             kmin=round(kl*sqrt(N));
         else
-            kmin=round(kl*T^(1/(d+delta)));
+            kmin=round(kl*N^(1/(d+delta)));
         end
     end
     if ~kmax_custom
         if est==1
             kmax=round(km*sqrt(N));
         else
-           kmax=round(km*T^(1/(d+delta)));
+           kmax=round(km*N^(1/(d+delta)));
         end
     end
 
@@ -259,11 +265,15 @@ if ~hcustom
         disp 'kmax <= kmin. Setting kmax = kmin + 1.'
         kmax=kmin+1;
     end
-    disp 'Automatically selecting h via k-nearest neighbors.'
-    fprintf('kmin: %i \rkmax: %i \r',kmin,kmax)
+    if ~quiet
+        disp 'Automatically selecting h via k-nearest neighbors.'
+        fprintf('kmin: %i \nkmax: %i \n',kmin,kmax)
+    end
     
     [~,kdists]=knnsearch([X; Y],[X; Y],'k',kmax+1,'Distance',dist_type);
-    fprintf('Choosing the %ith percentile distances among the data. \r',prc_thresh)
+    if ~quiet
+        fprintf('Choosing the %ith percentile distances among the data. \n',prc_thresh)
+    end
     hmin=prctile(kdists(:,kmin+1),prc_thresh);
     hmax=prctile(kdists(:,kmax+1),prc_thresh);
     h=linspace(hmin,hmax,L);
@@ -274,7 +284,9 @@ end
 
 % Compute the optimal weights
 
-disp 'Computing the optimal weights'
+if ~quiet
+    disp 'Computing the optimal weights'
+end
 if cvx_w
     w=calculateWeightsKDE_cvx(N,d,h,'eta',eta,'est',est,'delta',delta);
 else
@@ -283,12 +295,16 @@ end
 
 % Compute pairwise distances
 
-disp 'Computing the pairwise distances'
+if ~quiet
+    disp 'Computing the pairwise distances' 
+end
 Dxx=squareform(pdist(X,dist_type));
 Dxy=pdist2(Y,X,dist_type);
 
 % Estimating the plug-in estimators for each bandwidth value
-disp 'Computing the plug-in estimators'
+if ~quiet
+    disp 'Computing the plug-in estimators'
+end
 temp_kern=zeros(L,1);
 for t=1:L
     Qx=1/(M*h(t)^d)*sum(kernel_func(Dxy/h(t)));
@@ -303,8 +319,10 @@ end
 
 % Take the weighted sum of the plug-in estimators
 div_est=w'*temp_kern;
-disp 'Ensemble estimation complete'
+if ~quiet
+    disp 'Ensemble estimation complete'
+end
 
 if div_est<0
-    fprintf( 'Warning! Ensemble estimator returned a value less than zero. \rThis may not be appropriate for the chosen divergence functional. \rConsider changing the bandwidth range and rerunning. \r')
+    fprintf( 'Warning! Ensemble estimator returned a value less than zero. \nThis may not be appropriate for the chosen divergence functional. \nConsider changing the bandwidth range and rerunning. \n')
 end
