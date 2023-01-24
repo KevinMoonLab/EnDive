@@ -6,7 +6,6 @@
 % estimator, a different kernel, and a different distance function.
 
 %% Setup
-
 % Dimension
 d=10;
 
